@@ -1,0 +1,13 @@
+bin/*
+obj/*
+cam-filter-pro-DirectShow/.vs/*
+cam-filter-pro-DirectShow/Debug/*
+cam-filter-pro-DirectShow/Release/*
+cam-filter-pro-DirectShow/cam-filter-pro-DirectShow/Debug/*
+cam-filter-pro-DirectShow/cam-filter-pro-DirectShow/Release/*
+cam-filter-pro-DirectShow/cam-filter-pro-DirectShow/assets/*
+*.layout
+*.depend
+*.vcxproj.filters
+*.vcxproj.user
+*.sdf
