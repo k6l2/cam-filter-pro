@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <PROJECT_INCLUDES>$(SFML_HOME)\include</PROJECT_INCLUDES>
+    <PROJECT_LIBS>$(SFML_HOME)\lib</PROJECT_LIBS>
+    <PROJECT_BINS>$(SFML_HOME)\bin</PROJECT_BINS>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="PROJECT_INCLUDES">
+      <Value>$(PROJECT_INCLUDES)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="PROJECT_LIBS">
+      <Value>$(PROJECT_LIBS)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="PROJECT_BINS">
+      <Value>$(PROJECT_BINS)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

@@ -107,8 +107,8 @@ Matrix::Matrix(sf::RenderWindow& rw)
     {
         assert(false);
     }
-    intensityShader.setParameter("characterSize", float(CHARACTER_W), float(CHARACTER_H));
-    intensityShader.setParameter("matrixSize", float(matrixIntensity.getSize().x), float(matrixIntensity.getSize().y));
+	intensityShader.setUniform("characterSize", sf::Glsl::Vec2{ float(CHARACTER_W), float(CHARACTER_H) });
+	intensityShader.setUniform("matrixSize", sf::Glsl::Vec2{ float(matrixIntensity.getSize().x), float(matrixIntensity.getSize().y) });
     // Initialize minMaxIntensity //
     minMaxIntensity.create(2,1);
     if(!minMaxShader.loadFromFile("assets/calculate-min-max-intensity.frag", sf::Shader::Fragment))
@@ -134,9 +134,9 @@ Matrix::Matrix(sf::RenderWindow& rw)
     {
         assert(false);
     }
-    digitalRaindropsShader.setParameter("digitalRaindropsPrev", digitalRaindropsPrev.getTexture());
-    digitalRaindropsShader.setParameter("matrixIntensity", matrixIntensity.getTexture());
-    digitalRaindropsShader.setParameter("noise", texNoise.getTexture());
+    digitalRaindropsShader.setUniform("digitalRaindropsPrev", digitalRaindropsPrev.getTexture());
+    digitalRaindropsShader.setUniform("matrixIntensity", matrixIntensity.getTexture());
+    digitalRaindropsShader.setUniform("noise", texNoise.getTexture());
     // Initialize matrixRain //
     matrixRain.create(matrixIntensity.getSize().x, matrixIntensity.getSize().y*3);
     matrixRain.clear(sf::Color(0,0,0,0));
@@ -150,21 +150,21 @@ Matrix::Matrix(sf::RenderWindow& rw)
     {
         assert(false);
     }
-    matrixRainShader.setParameter("digitalRaindrops", digitalRaindrops.getTexture());
-    matrixRainShader.setParameter("matrixIntensity", matrixIntensity.getTexture());
-    matrixRainShader.setParameter("matrixRainPrev", matrixRainPrev.getTexture());
+    matrixRainShader.setUniform("digitalRaindrops", digitalRaindrops.getTexture());
+    matrixRainShader.setUniform("matrixIntensity", matrixIntensity.getTexture());
+    matrixRainShader.setUniform("matrixRainPrev", matrixRainPrev.getTexture());
     // Initialize matrix shader //
     if(!m_shader.loadFromFile("assets/matrix.frag", sf::Shader::Fragment))
     {
         assert(false);
     }
-    m_shader.setParameter("glyphCodex", glyphCodex);
-    m_shader.setParameter("characterSize", float(CHARACTER_W), float(CHARACTER_H));
-    m_shader.setParameter("codexColumns", float(codexColumns));
-    m_shader.setParameter("orderedGlyphIndices", orderedGlyphIndicesTex);
-    m_shader.setParameter("matrixIntensity", matrixIntensity.getTexture());
-    m_shader.setParameter("minMaxIntensity", minMaxIntensity.getTexture());
-    m_shader.setParameter("matrixRain", matrixRain.getTexture());
+    m_shader.setUniform("glyphCodex", glyphCodex);
+	m_shader.setUniform("characterSize", sf::Glsl::Vec2{ float(CHARACTER_W), float(CHARACTER_H) });
+    m_shader.setUniform("codexColumns", float(codexColumns));
+    m_shader.setUniform("orderedGlyphIndices", orderedGlyphIndicesTex);
+    m_shader.setUniform("matrixIntensity", matrixIntensity.getTexture());
+    m_shader.setUniform("minMaxIntensity", minMaxIntensity.getTexture());
+    m_shader.setUniform("matrixRain", matrixRain.getTexture());
 }
 Matrix::~Matrix()
 {
@@ -208,7 +208,7 @@ void Matrix::step(float deltaSeconds, const sf::Image& camImage)
             else
             {
                 unsigned index = float(theGrid[r][c].cameraIntensity - minIntensity)/minMaxRange*orderedGlyphIndices.size();
-                index = std::min(std::max(index, unsigned(0)), orderedGlyphIndices.size() - 1);
+                index = std::min(std::max(index, unsigned(0)), unsigned(orderedGlyphIndices.size() - 1));
                 theGrid[r][c].spriteId = orderedGlyphIndices[index];
             }
             glyphSprite.setPosition(c*CHARACTER_W, r*CHARACTER_H);
@@ -240,8 +240,8 @@ void Matrix::stepShader(float deltaSeconds, const sf::Sprite& camSprite)
 		sf::Sprite sprDigitalRaindrops(digitalRaindrops.getTexture());
 		digitalRaindropsPrev.draw(sprDigitalRaindrops, sf::BlendMode(sf::BlendMode::One, sf::BlendMode::Zero));
 		digitalRaindropsPrev.display();
-		digitalRaindropsShader.setParameter("deltaSeconds", timePassedSinceLastFrame.asSeconds());
-		digitalRaindropsShader.setParameter("time", seconds);
+		digitalRaindropsShader.setUniform("deltaSeconds", timePassedSinceLastFrame.asSeconds());
+		digitalRaindropsShader.setUniform("time", seconds);
 		sf::RenderStates statesDigitalRain(&digitalRaindropsShader);
 		statesDigitalRain.blendMode = sf::BlendMode(sf::BlendMode::One, sf::BlendMode::Zero);
 		digitalRaindrops.draw(sprDigitalRaindrops, statesDigitalRain);
@@ -250,7 +250,7 @@ void Matrix::stepShader(float deltaSeconds, const sf::Sprite& camSprite)
 		sf::Sprite sprMatrixRain(matrixRain.getTexture());
 		matrixRainPrev.draw(sprMatrixRain, sf::BlendMode(sf::BlendMode::One, sf::BlendMode::Zero));
 		matrixRainPrev.display();
-		matrixRainShader.setParameter("deltaSeconds", timePassedSinceLastFrame.asSeconds());
+		matrixRainShader.setUniform("deltaSeconds", timePassedSinceLastFrame.asSeconds());
 		sf::RenderStates statesMatrixRain(&matrixRainShader);
 		statesMatrixRain.blendMode = sf::BlendMode(sf::BlendMode::One, sf::BlendMode::Zero);
 		matrixRain.draw(sprMatrixRain, statesMatrixRain);
