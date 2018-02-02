@@ -3,10 +3,12 @@
 #include <SFML/Graphics.hpp>
 #include <windows.h>
 #include <dshow.h>
+#include <cassert>
 #include "../../src/Matrix.h"
 // maybe research this wrapper shit again? http://www.codeguru.com/cpp/g-m/directx/directshow/article.php/c9551/DirectShow-SingleFrame-Capture-Class-Without-MFC.htm
 /// WTF? https://social.msdn.microsoft.com/Forums/windowsdesktop/en-US/ac877e2d-80a7-47b6-b315-5e3160b8b219/alternative-for-isamplegrabber?forum=windowsdirectshowdevelopment ///
 #pragma comment(lib,"Strmiids.lib")
+const sf::String STR_WINDOW_TITLE = "Cam Filter Pro - DirectShow";
 interface ISampleGrabberCB : public IUnknown
 {
 	virtual STDMETHODIMP SampleCB(double SampleTime, IMediaSample *pSample) = 0;
@@ -123,40 +125,48 @@ HRESULT ConnectFilters(
     pOut->Release();
     return hr;
 }
+// returns the # of actual devices there are, which is <= numDevicesToEnumerate
+ULONG enumerateVideoInputDevices()
+{
+	HRESULT hr;
+	ICreateDevEnum* cDevEnum = nullptr;
+	IEnumMoniker* enumMoniker = nullptr;
+	IMoniker* moniker = nullptr;
+	ULONG numMonikersRetrieved = 0;
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, nullptr, CLSCTX_INPROC, IID_ICreateDevEnum, (void**)&cDevEnum);
+	hr = cDevEnum ? cDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &enumMoniker, 0) : 0;
+	while (enumMoniker->Next(1, &moniker, NULL) == S_OK)
+	{
+		IPropertyBag *pPropBag;
+		hr = moniker->BindToStorage(0, 0, IID_IPropertyBag, (void**)&pPropBag);
+		VARIANT varName;
+		VariantInit(&varName);
+		hr = pPropBag->Read(L"FriendlyName", &varName, NULL);
+		//printf("Device[%d]=\"%ls\"\n", numMonikersRetrieved++, varName.bstrVal);
+		std::wcout << "Device[" << numMonikersRetrieved++ << "]=\"" << varName.bstrVal << "\"\n";
+		VariantClear(&varName);
+		pPropBag->Release();
+		moniker->Release();
+	}
+	enumMoniker->Release();
+	cDevEnum->Release();
+	return numMonikersRetrieved;
+}
 int main(int argc, char** argv)
 {
-	// WTF IS EVEN HAPPENING HERE? //
+	// Reference: //
 	// http://www.codeproject.com/Articles/12869/Real-time-video-image-processing-frame-grabber-usi //
-	//HRESULT hr = CoInitialize(0); MSG msg = { 0 }; DWORD no;
-	//IGraphBuilder*  graph = 0;  hr = CoCreateInstance(CLSID_FilterGraph, 0, CLSCTX_INPROC, IID_IGraphBuilder, (void **)&graph);
-	//IMediaControl*  ctrl = 0;  hr = graph->QueryInterface(IID_IMediaControl, (void **)&ctrl);
-	//ICreateDevEnum* devs = 0;  hr = CoCreateInstance(CLSID_SystemDeviceEnum, 0, CLSCTX_INPROC, IID_ICreateDevEnum, (void **)&devs);
-	//IEnumMoniker*   cams = 0;  hr = devs ? devs->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &cams, 0) : 0;
-	//IMoniker*       mon = 0;  hr = cams->Next(1, &mon, 0);  // get first found capture device (webcam?)    
-	//IBaseFilter*    cam = 0;  hr = mon->BindToObject(0, 0, IID_IBaseFilter, (void**)&cam);
-	//hr = graph->AddFilter(cam, L"Capture Source"); // add web cam to graph as source
-	//IEnumPins*      pins = 0;  hr = cam ? cam->EnumPins(&pins) : 0;   // we need output pin to autogenerate rest of the graph
-	//IPin*           pin = 0;  hr = pins ? pins->Next(1, &pin, 0) : 0; // via graph->Render
-	//IAMStreamConfig* cfg = 0;  hr = pin->QueryInterface(IID_IAMStreamConfig, (void **)&cfg);  // (Those are optional steps to set better resolution)
-	//int       sz, max_res = 0;  hr = cfg->GetNumberOfCapabilities(&max_res, &sz);
-	//VIDEO_STREAM_CONFIG_CAPS cap[2]; // find last =
-	//AM_MEDIA_TYPE*  fmt = 0;  hr = cfg->GetStreamCaps(max_res - 1, &fmt, (BYTE*)cap);     // max supported resolution (cap contains res x and y sizes)
-	//hr = cfg->SetFormat(fmt); // and set it to device before capture starts
-	//hr = graph->Render(pin); // graph builder now builds whole filter chain including MJPG decompression on some webcams
-	//IEnumFilters*   fil = 0;  hr = graph->EnumFilters(&fil); // from all newly added filters
-	//IBaseFilter*    rnd = 0;  hr = fil->Next(1, &rnd, 0); // we find last one (renderer)
-	//hr = rnd->EnumPins(&pins);  // because data we are intersted in are pumped to renderers input pin 
-	//hr = pins->Next(1, &pin, 0); // via Receive member of IMemInputPin interface
-	//IMemInputPin*   mem = 0;  hr = pin->QueryInterface(IID_IMemInputPin, (void**)&mem);
-	//DsHook(mem, 6, Receive); // so we redirect it to our own proc to grab image data
-	//hr = ctrl->Run();
-	//////////////////////////////////////////////////////////////////////////////////////////////////
 	HRESULT hr = CoInitialize(nullptr);
+	const ULONG numVideoInputDevices = enumerateVideoInputDevices();
+	ULONG selectedDevice;
+	std::cout << "Select a device:";
+	std::cin >> selectedDevice;
 	IGraphBuilder* graph = nullptr;
 	IMediaControl* mControl = nullptr;
 	ICreateDevEnum* cDevEnum = nullptr;
 	IEnumMoniker* eMoniker = nullptr;
-	IMoniker* moniker = nullptr;
+	ULONG numMonikersRetrieved;
+	IMoniker** monikers = new IMoniker*[numVideoInputDevices];
 	IBaseFilter* camFilter = nullptr;
 	IBaseFilter* sGrabberFilter = nullptr;
 	ISampleGrabber* sGrabber = nullptr;
@@ -170,14 +180,20 @@ int main(int argc, char** argv)
 	AM_MEDIA_TYPE mt;
 	AM_MEDIA_TYPE* mtPointer;
 	VIDEOINFOHEADER* vih;
+	// Setup the graph, media filter, and media control //
 	hr = CoCreateInstance(CLSID_FilterGraph, nullptr, CLSCTX_INPROC, IID_IGraphBuilder, (void**)&graph);
 	hr = graph->QueryInterface(IID_IMediaFilter, (void**)&mFilter);
+	/// no idea what's actually going on here... is the filter even necessary??
 	mFilter->SetSyncSource(nullptr);
 	hr = graph->QueryInterface(IID_IMediaControl, (void**)&mControl);
+	// Now actually get the video devices here: //
 	hr = CoCreateInstance(CLSID_SystemDeviceEnum, nullptr, CLSCTX_INPROC, IID_ICreateDevEnum, (void**)&cDevEnum);
 	hr = cDevEnum ? cDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &eMoniker, 0) : 0;
-	hr = eMoniker->Next(1, &moniker, nullptr);// get first capture device (hope for webcam)
-	hr = moniker->BindToObject(nullptr, nullptr, IID_IBaseFilter, (void**)&camFilter);
+	hr = eMoniker->Next(numVideoInputDevices, monikers, &numMonikersRetrieved);
+	assert(numVideoInputDevices == numMonikersRetrieved);
+	assert(selectedDevice < numVideoInputDevices);
+	// get selected capture device
+	hr = monikers[selectedDevice]->BindToObject(nullptr, nullptr, IID_IBaseFilter, (void**)&camFilter);
 	hr = graph->AddFilter(camFilter, L"Camera Capture Filter");
 	//Get camera configuration shit now: //
 	hr = camFilter->EnumPins(&camOutputPins);
@@ -196,31 +212,14 @@ int main(int argc, char** argv)
 		if (mtPointer->formattype == FORMAT_VideoInfo)
 		{
 			vih = (VIDEOINFOHEADER*)mtPointer->pbFormat;
-			//std::cout << "\trcSource=[" << vih->rcSource.left <<"," <<
-			//	vih->rcSource.top << "," << 
-			//	vih->rcSource.right << "," << 
-			//	vih->rcSource.bottom << "]\n";
-			//std::cout << "\trcTarget=[" << vih->rcTarget.left <<"," <<
-			//	vih->rcTarget.top << "," <<
-			//	vih->rcTarget.right << "," <<
-			//	vih->rcTarget.bottom << "]\n";
 			std::cout << "\tAvgTimePerFrame=" << vih->AvgTimePerFrame<<std::endl;
 		}
-		unsigned formatNum = 50;
-		if (argc > 1)
-		{
-			formatNum = atoi(argv[1]);
-		}
-		if (c == formatNum)
-		{
-			camConfig->SetFormat(mtPointer);
-		}
 	}
-	if (argc < 2)
-	{
-		std::cout << "usage: " << argv[0] << " [format#]\n";
-		return 0;
-	}
+	int selectedFormatNum;
+	std::cout << "Select a format#:";
+	std::cin >> selectedFormatNum;
+	hr = camConfig->GetStreamCaps(selectedFormatNum, &mtPointer, (BYTE*)&videoCapabilities);
+	camConfig->SetFormat(mtPointer);
 	std::cout << "program full path=" << argv[0] << std::endl;
 	////////////////////////////////////////
 	hr = CoCreateInstance(CLSID_SampleGrabber, nullptr, CLSCTX_INPROC_SERVER, IID_IBaseFilter, (void**)&sGrabberFilter);
@@ -239,13 +238,14 @@ int main(int argc, char** argv)
 	vih = (VIDEOINFOHEADER*)mt.pbFormat;
 	std::cout << "biWidth=" << vih->bmiHeader.biWidth << " biHeight=" << vih->bmiHeader.biHeight << std::endl;
 	//////////////////////////////////////////////////////////////////////////////////////////////////
-	sf::RenderWindow window(sf::VideoMode(vih->bmiHeader.biWidth, vih->bmiHeader.biHeight), "SFML window");
+	sf::RenderWindow window{ sf::VideoMode(vih->bmiHeader.biWidth, vih->bmiHeader.biHeight), STR_WINDOW_TITLE };
 	Matrix theMatrix(window);
 	sf::Image cameraImage;
 	cameraImage.create(vih->bmiHeader.biWidth, vih->bmiHeader.biHeight, sf::Color(255, 0, 0));
 	sf::Texture cameraTex;
 	cameraTex.loadFromImage(cameraImage);
 	sf::Sprite cameraSprite(cameraTex);
+	const float camImageAspectRatio = cameraImage.getSize().x / float(cameraImage.getSize().y);
 	long bufferSize = 0;
 	char* cameraBuffer = nullptr;
 	while (window.isOpen())
@@ -259,8 +259,19 @@ int main(int argc, char** argv)
 				window.close();
 				break;
 			case sf::Event::KeyPressed:
+				if (!window.hasFocus())
+				{
+					break;
+				}
 				switch (event.key.code)
 				{
+				case sf::Keyboard::F9:
+				{
+					sf::Vector2u newSize = window.getSize();
+					newSize.x = unsigned(newSize.y*camImageAspectRatio);
+					window.setSize(newSize);
+				}
+					break;
 				case sf::Keyboard::Escape:
 					window.close();
 					break;

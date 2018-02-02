@@ -9,5 +9,5 @@ cam-filter-pro-DirectShow/cam-filter-pro-DirectShow/assets/*
 *.layout
 *.depend
 *.vcxproj.filters
-*.vcxproj.user
+#*.vcxproj.user
 *.sdf
