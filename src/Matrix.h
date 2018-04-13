@@ -13,6 +13,8 @@ class Matrix
             unsigned long long cameraIntensity;
         };
     private:
+		static const char* const FONT_DATA;
+		static const char* const GLYPH_CODEX;
         struct GlyphData
         {
             uint8_t index;
