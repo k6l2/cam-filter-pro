@@ -154,13 +154,33 @@ ULONG enumerateVideoInputDevices()
 }
 int main(int argc, char** argv)
 {
+	const bool useProgramArgs = argc == 3;
+	int paramDevice;
+	int paramFormat;
+	if (useProgramArgs)
+	{
+		paramDevice = atoi(argv[1]);
+		paramFormat = atoi(argv[2]);
+	}
+	else
+	{
+		std::cout << "NOTE: if you don't want the program to prompt for device/format, use the following.\n";
+		std::cout << "Usage: cam-filter-pro-DirectShow.exe [device] [format]\n";
+	}
 	// Reference: //
 	// http://www.codeproject.com/Articles/12869/Real-time-video-image-processing-frame-grabber-usi //
 	HRESULT hr = CoInitialize(nullptr);
 	const ULONG numVideoInputDevices = enumerateVideoInputDevices();
 	ULONG selectedDevice;
-	std::cout << "Select a device:";
-	std::cin >> selectedDevice;
+	if (useProgramArgs)
+	{
+		selectedDevice = paramDevice;
+	}
+	else
+	{
+		std::cout << "Select a device:";
+		std::cin >> selectedDevice;
+	}
 	IGraphBuilder* graph = nullptr;
 	IMediaControl* mControl = nullptr;
 	ICreateDevEnum* cDevEnum = nullptr;
@@ -216,8 +236,15 @@ int main(int argc, char** argv)
 		}
 	}
 	int selectedFormatNum;
-	std::cout << "Select a format#:";
-	std::cin >> selectedFormatNum;
+	if (useProgramArgs)
+	{
+		selectedFormatNum = paramFormat;
+	}
+	else
+	{
+		std::cout << "Select a format#:";
+		std::cin >> selectedFormatNum;
+	}
 	hr = camConfig->GetStreamCaps(selectedFormatNum, &mtPointer, (BYTE*)&videoCapabilities);
 	camConfig->SetFormat(mtPointer);
 	std::cout << "program full path=" << argv[0] << std::endl;
